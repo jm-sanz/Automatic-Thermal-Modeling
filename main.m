@@ -1,70 +1,43 @@
-% Date: 31.12.2023
+% Date: 02.11.2023
 % Author: José Miguel Sanz Alcaine (jm_sanz@unizar.es)
 % Code for replicating the results from the work: Estimation of Semiconductor Power Losses Through Automatic Thermal Modeling 
-% Sampling time is Ts= 100ms
+% Sampling time is Ts = 100ms
+
 clear all, close all, clc
 
-% Load experiments data (MATLAB structures format)
-load("data\test_sat.mat", "test_sat");
-load("data\test_lin.mat", "test_lin");
-load("data\test_driver.mat", "test_driver");
-load("data\test_inductor.mat", "test_inductor");
-
-% Concatenate structures
-test_array = [test_sat, test_lin, test_driver, test_inductor];
-number_test = length(test_array);
-r_acc = zeros(1,number_test);
-
+% Load experiments data
 n = 6; % Number of power variables
-m = 8; % Number of temperature variables
+m = 8; % Number of temperature variables 
 
-% Format data into Powers and Temperature matrices
-for i=1:number_test
-    if(i==1)
-        r_acc(i)=test_array(i).size;
-    else
-        r_acc(i)=r_acc(i-1) + test_array(i).size;    
-    end
-end
+% where 
 
-Powers = zeros(n,r_acc(end));
-Temperatures = zeros(m,r_acc(end));
+% Temperatures      Power
+  % 1. Q_h           Q_h
+  % 2. Q_l           Q_l
+  % 3. Drv_h         Drv_h
+  % 4. Drv_l         Drv_l
+  % 5. Vin           R_PCB1_PCB2
+  % 6. Vsw           R_PCB3_PCB4_L_PCB5
+  % 7. GND
+  % 8. L
 
-for i=1:number_test
+SaturationExperiment= readmatrix('Temp_Powers_Sat.csv');
+LinearExperiment= readmatrix('Temp_Powers_Lin.csv');
+DriverExperiment= readmatrix('Temp_Powers_Drv.csv');
+InductorExperiment= readmatrix('Temp_Powers_Ind.csv');
 
-    test_data = test_array(i);
-    if(i == 1)
-        initial_ix = 1;
-    else
-        initial_ix = r_acc(i-1) + 1;
-    end
+Temp_Sat = SaturationExperiment(1:m,:);
+Temp_Lin = LinearExperiment(1:m,:);
+Temp_Drv = DriverExperiment(1:m,:);
+Temp_Ind = InductorExperiment(1:m,:);
 
-    final_ix = r_acc(i);
+Power_Sat = SaturationExperiment(m+1:end,:);
+Power_Lin = LinearExperiment(m+1:end,:);
+Power_Drv = DriverExperiment(m+1:end,:);
+Power_Ind = InductorExperiment(m+1:end,:);
 
-
-    Temperatures(1,initial_ix:final_ix) = test_data.state.temp_hs - test_data.state.temp_amb;
-    Temperatures(2,initial_ix:final_ix) = test_data.state.temp_ls- test_data.state.temp_amb;
-    Temperatures(3,initial_ix:final_ix) = test_data.state.temp_drv_hs - test_data.state.temp_amb;
-    Temperatures(4,initial_ix:final_ix) = test_data.state.temp_drv_ls - test_data.state.temp_amb;
-    Temperatures(5,initial_ix:final_ix) = test_data.state.temp_vin - test_data.state.temp_amb;
-    Temperatures(6,initial_ix:final_ix) = test_data.state.temp_vsw - test_data.state.temp_amb;
-    Temperatures(7,initial_ix:final_ix) = test_data.state.temp_gnd - test_data.state.temp_amb;
-    Temperatures(8,initial_ix:final_ix) = test_data.state.temp_inductor - test_data.state.temp_amb;
-
-
-       if(i ~= 1)
-        delta = (Temperatures(1:m,initial_ix - 1) - Temperatures(1:m,initial_ix));
-        Temperatures(1:m,initial_ix:final_ix) = Temperatures(1:m,initial_ix:final_ix) + delta;
-       end
-
-    Powers(1,initial_ix:final_ix) = test_data.input.power_transistorh;
-    Powers(2,initial_ix:final_ix) = test_data.input.power_transistorl;
-    Powers(3,initial_ix:final_ix) = test_data.input.power_drvh;
-    Powers(4,initial_ix:final_ix) = test_data.input.power_drvl;
-    Powers(5,initial_ix:final_ix) = test_data.input.power_trackh;
-    Powers(6,initial_ix:final_ix) = test_data.input.power_inductor;
-end
-
+Temperatures = [Temp_Sat Temp_Lin Temp_Drv Temp_Ind];
+Powers = [Power_Sat Power_Lin Power_Drv Power_Ind];
 %% TRAIN AND TEST WITH THE SAME DATA
 % State-Space Definitions
 u_k = (Temperatures(:,1:end-1));
@@ -107,11 +80,11 @@ x_sim = pinv(B)*(u_k_1_filt - A*u_k_filt);
 
 % Plots
 figure(1)
+title('Results tested with training data')
 subplot(2,1,1)
 plot(u_sim')
 xlabel('Samples (n)')
 ylabel('\Delta{\it T} (ºC)')
-title('Results tested with training data')
 subplot(2,1,2)
 plot(x_sim')
 xlabel('Samples (n)')
@@ -240,7 +213,7 @@ subplot(2,1,1)
 plot(u_sim_sat')
 xlabel('Samples (n)')
 ylabel('\Delta{\it T} (ºC)')
-title('Results tested with data different from training data (Saturation case)')
+title('Results tested with data different from training data')
 subplot(2,1,2)
 plot(x_sim_sat')
 xlabel('Samples (n)')
